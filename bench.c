@@ -1,11 +1,16 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
 
+#include "arena.h"
 #include "cached.h"
 
 #define UNUSED __attribute__((unused))
+
+#define ALLOC_SIZE 4096
+#define ARENA_SIZE (1024*ALLOC_SIZE)
 
 static sig_atomic_t running;
 
@@ -51,6 +56,7 @@ bench_malloc(size_t allocs, size_t objsize)
 	while (running) {
 		for (size_t i = 0; i < allocs; i++) {
 			objs[i] = calloc(1, objsize);
+			assert(objs[i]);
 			count++;
 		}
 		for (size_t i = 0; i < allocs; i++) {
@@ -70,6 +76,7 @@ bench_ca_alloc(size_t allocs)
 	while (running) {
 		for (size_t i = 0; i < allocs; i++) {
 			objs[i] = ca_alloc();
+			assert(objs[i]);
 			count++;
 		}
 		for (size_t i = 0; i < allocs; i++) {
@@ -80,10 +87,28 @@ bench_ca_alloc(size_t allocs)
 	return count;
 }
 
+static size_t
+bench_ar_alloc(size_t allocs, size_t size)
+{
+	void *objs[allocs];
+	size_t count = 0;
+
+	while (running) {
+		for (size_t i = 0; i < allocs; i++) {
+			objs[i] = ar_alloc(size);
+			assert(objs[i]);
+			count++;
+		}
+		ar_free(); /* feels like cheating but it's not really */
+	}
+
+	return count;
+}
+
 static void
 bench_four(void)
 {
-	if (ca_setup(256, 4096) < 0) {
+	if (ca_setup(ALLOC_SIZE, 4096) < 0) {
 		panic("failed to setup cached allocator");
 	}
 
@@ -99,7 +124,7 @@ bench_four(void)
 static void
 bench_one(void)
 {
-	if (ca_setup(256, 1024) < 0) {
+	if (ca_setup(ALLOC_SIZE, 1024) < 0) {
 		panic("failed to setup cached allocator");
 	}
 
@@ -115,7 +140,7 @@ bench_one(void)
 static void
 bench_two(void)
 {
-	if (ca_setup(256, 16) < 0) {
+	if (ca_setup(ALLOC_SIZE, 16) < 0) {
 		panic("failed to setup cached allocator");
 	}
 
@@ -133,9 +158,25 @@ bench_three(void)
 {
 	set_alarm();
 
-	size_t allocs = bench_malloc(1024, 256);
+	size_t allocs = bench_malloc(1024, ALLOC_SIZE);
 
 	printf("%-12s\t%9zu allocs/second\n", "just_malloc", allocs);
+}
+
+static void
+bench_five(void)
+{
+	if (ar_setup(ARENA_SIZE) < 0) {
+		panic("failed to setup arena allocator");
+	}
+
+	set_alarm();
+
+	size_t allocs = bench_ar_alloc(1024, ALLOC_SIZE);
+
+	printf("%-12s\t%9zu allocs/second\n", "ar_alloc", allocs);
+
+	ar_cleanup();
 }
 
 int
@@ -148,6 +189,8 @@ main(void)
 	bench_two();
 	bench_one();
 	bench_four();
+	puts("");
+	bench_five();
 
 	exit(EXIT_SUCCESS);
 }
