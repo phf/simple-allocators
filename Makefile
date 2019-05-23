@@ -6,7 +6,7 @@ ALL=bench
 
 all: $(ALL)
 
-bench: bench.o arena.o cached.o
+bench: bench.o arena.o cached.o pool.o
 
 clean:
 	$(RM) $(ALL) *.o

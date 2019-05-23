@@ -6,11 +6,12 @@
 
 #include "arena.h"
 #include "cached.h"
+#include "pool.h"
 
 #define UNUSED __attribute__((unused))
 
 #define ALLOC_SIZE 4096
-#define ARENA_SIZE (1024*ALLOC_SIZE)
+#define ARENA_SIZE (1024 * ALLOC_SIZE)
 
 static sig_atomic_t running;
 
@@ -81,6 +82,26 @@ bench_ca_alloc(size_t allocs)
 		}
 		for (size_t i = 0; i < allocs; i++) {
 			ca_free(objs[i]);
+		}
+	}
+
+	return count;
+}
+
+static size_t
+bench_pl_alloc(size_t allocs)
+{
+	void *objs[allocs];
+	size_t count = 0;
+
+	while (running) {
+		for (size_t i = 0; i < allocs; i++) {
+			objs[i] = pl_alloc();
+			assert(objs[i]);
+			count++;
+		}
+		for (size_t i = 0; i < allocs; i++) {
+			pl_free(objs[i]);
 		}
 	}
 
@@ -179,6 +200,22 @@ bench_five(void)
 	ar_cleanup();
 }
 
+static void
+bench_six(void)
+{
+	if (pl_setup(4096, 1024) < 0) {
+		panic("failed to setup pool allocator");
+	}
+
+	set_alarm();
+
+	size_t allocs = bench_pl_alloc(1024);
+
+	printf("%-12s\t%9zu allocs/second\n", "pl_alloc", allocs);
+
+	pl_cleanup();
+}
+
 int
 main(void)
 {
@@ -191,6 +228,8 @@ main(void)
 	bench_four();
 	puts("");
 	bench_five();
+	puts("");
+	bench_six();
 
 	exit(EXIT_SUCCESS);
 }
