@@ -1,8 +1,8 @@
+#include "cached.h"
+
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "cached.h"
 
 static size_t object_size;
 static size_t max_cached;
@@ -18,7 +18,7 @@ ca_setup(size_t osize, size_t csize)
 	}
 
 	cache = calloc(csize, sizeof(*cache));
-	if (cache == NULL) {
+	if (!cache) {
 		return -2;
 	}
 
@@ -32,7 +32,7 @@ ca_setup(size_t osize, size_t csize)
 void *
 ca_alloc(void)
 {
-	assert(cache != NULL);
+	assert(cache);
 
 	if (num_cached > 0) {
 		void *object = cache[--num_cached];
@@ -45,9 +45,9 @@ ca_alloc(void)
 void
 ca_free(void *object)
 {
-	assert(cache != NULL);
+	assert(cache);
 
-	if (object == NULL) {
+	if (!object) {
 		/* free(3) also does nothing for NULL */
 		return;
 	}

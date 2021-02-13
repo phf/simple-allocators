@@ -1,19 +1,21 @@
+#include "arena.h"
+#include "cached.h"
+#include "pool.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
 
-#include "arena.h"
-#include "cached.h"
-#include "pool.h"
-
 #define UNUSED __attribute__((unused))
 
-#define ALLOC_SIZE 4096
+#define ALLOC_SIZE (4096)
 #define ARENA_SIZE (1024 * ALLOC_SIZE)
+#define POOL_SIZE (1024)
+#define MEASURE_SECONDS (1)
 
-static sig_atomic_t running;
+static volatile sig_atomic_t running;
 
 static void
 panic(const char *msg)
@@ -45,7 +47,7 @@ static void
 set_alarm(void)
 {
 	running = 1;
-	alarm(1);
+	alarm(MEASURE_SECONDS);
 }
 
 static size_t
@@ -137,7 +139,8 @@ bench_four(void)
 
 	size_t allocs = bench_ca_alloc(1024);
 
-	printf("%-12s\t%9zu allocs/second\n", "huge_cache", allocs);
+	printf("%-12s\t%9zu allocs/second\n", "huge_cache",
+			allocs / MEASURE_SECONDS);
 
 	ca_cleanup();
 }
@@ -153,7 +156,8 @@ bench_one(void)
 
 	size_t allocs = bench_ca_alloc(1024);
 
-	printf("%-12s\t%9zu allocs/second\n", "large_cache", allocs);
+	printf("%-12s\t%9zu allocs/second\n", "large_cache",
+			allocs / MEASURE_SECONDS);
 
 	ca_cleanup();
 }
@@ -169,7 +173,8 @@ bench_two(void)
 
 	size_t allocs = bench_ca_alloc(1024);
 
-	printf("%-12s\t%9zu allocs/second\n", "small_cache", allocs);
+	printf("%-12s\t%9zu allocs/second\n", "small_cache",
+			allocs / MEASURE_SECONDS);
 
 	ca_cleanup();
 }
@@ -181,7 +186,8 @@ bench_three(void)
 
 	size_t allocs = bench_malloc(1024, ALLOC_SIZE);
 
-	printf("%-12s\t%9zu allocs/second\n", "just_malloc", allocs);
+	printf("%-12s\t%9zu allocs/second\n", "just_malloc",
+			allocs / MEASURE_SECONDS);
 }
 
 static void
@@ -195,7 +201,8 @@ bench_five(void)
 
 	size_t allocs = bench_ar_alloc(1024, ALLOC_SIZE);
 
-	printf("%-12s\t%9zu allocs/second\n", "ar_alloc", allocs);
+	printf("%-12s\t%9zu allocs/second\n", "ar_alloc",
+			allocs / MEASURE_SECONDS);
 
 	ar_cleanup();
 }
@@ -203,7 +210,7 @@ bench_five(void)
 static void
 bench_six(void)
 {
-	if (pl_setup(4096, 1024) < 0) {
+	if (pl_setup(POOL_SIZE, ALLOC_SIZE) < 0) {
 		panic("failed to setup pool allocator");
 	}
 
@@ -211,7 +218,8 @@ bench_six(void)
 
 	size_t allocs = bench_pl_alloc(1024);
 
-	printf("%-12s\t%9zu allocs/second\n", "pl_alloc", allocs);
+	printf("%-12s\t%9zu allocs/second\n", "pl_alloc",
+			allocs / MEASURE_SECONDS);
 
 	pl_cleanup();
 }

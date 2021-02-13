@@ -7,5 +7,6 @@ IndentCaseLabels: false
 
 AlwaysBreakAfterReturnType: All
 AlignAfterOpenBracket: DontAlign
+AlignTrailingComments: false
 ContinuationIndentWidth: 16
 SortIncludes: false

@@ -1,37 +1,35 @@
+#include "pool.h"
+
 #include <assert.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "pool.h"
+static void *pool; /* the actual pool of memory */
+static size_t blocks; /* number of blocks */
+static size_t block_size; /* size of one block */
 
-/* the actual pool of memory */
-static void *pool;
-/* size of one block in the pool */
-static size_t block_size;
-/* number of blocks in the pool */
-static size_t blocks;
+static uint64_t *used; /* bitmap to track allocated blocks */
+static const size_t BITS = sizeof(*used) * CHAR_BIT; /* bits per slot */
 
-/* bitmap to track allocated blocks */
-static uint64_t *used;
-/* number of bits in each slot of `used` */
-static const size_t BITS = sizeof(*used) * CHAR_BIT;
-
-/* Allocate a bitmap with at least `blocks` bits. */
+/*
+ * Allocate a bitmap with at least `size` bits.
+ * Returns NULL on failure.
+ */
 static uint64_t *
-bitmap(size_t blocks)
+bitmap(size_t size)
 {
-	assert(blocks > 0);
+	assert(size > 0);
 
-	const size_t slots = (blocks / BITS) + 1;
+	const size_t slots = (size / BITS) + 1;
 
-	uint64_t *p = calloc(1, sizeof(*p) * slots);
+	uint64_t *p = calloc(slots, sizeof(*p));
 	return p; /* this is fine */
 }
 
 /* Mark given `block` as free. */
-static void
+static inline void
 bitmap_free(size_t block)
 {
 	assert(block < blocks);
@@ -43,7 +41,7 @@ bitmap_free(size_t block)
 }
 
 /* Mark given `block` as used. */
-static void
+static inline void
 bitmap_used(size_t block)
 {
 	assert(block < blocks);
@@ -71,7 +69,7 @@ find_zero(const uint64_t bits)
 }
 
 static inline uint64_t
-log2(const uint64_t x)
+ulog2(const uint64_t x)
 {
 	return ((BITS - 1) - __builtin_clzl(x)); /* count leading zeros */
 }
@@ -83,24 +81,24 @@ bitmap_alloc(void)
 	for (size_t i = 0; i < blocks / BITS; i++) {
 		uint64_t free = find_zero(used[i]);
 		if (free != 0) {
-			return i * BITS + log2(free);
+			return i * BITS + ulog2(free);
 		}
 	}
 	return -1;
 }
 
 int
-pl_setup(size_t object_size, size_t pool_size)
+pl_setup(size_t pool_size, size_t object_size)
 {
 	assert(object_size > 0 && pool_size > 0);
 
 	void *p = calloc(pool_size, object_size);
-	if (p == NULL) {
+	if (!p) {
 		return -1;
 	}
 
 	uint64_t *q = bitmap(pool_size);
-	if (q == NULL) {
+	if (!q) {
 		free(p);
 		return -2;
 	}
@@ -137,7 +135,7 @@ pl_free(void *object)
 {
 	assert(pool);
 
-	if (object == NULL) {
+	if (!object) {
 		/* free(3) also does nothing for NULL */
 		return;
 	}
